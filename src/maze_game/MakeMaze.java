@@ -37,9 +37,9 @@ public class MakeMaze {
 
         // 4) 출구 생성 (오른쪽 끝에서 아래쪽 우선)
         for (int y = hei - 2; y >= 1; y--) {
-            if (maze[y][wid - 3] == 1) {
-                maze[y][wid - 2] = 1;
-                exitX = wid - 2;
+            if (maze[y][wid - 2] == 1) {   // 내부가 길인지 확인
+                maze[y][wid - 1] = 1;      // ★ 테두리 벽 하나 뚫기
+                exitX = wid - 1;
                 exitY = y;
                 break;
             }
@@ -72,7 +72,6 @@ public class MakeMaze {
         }
     }
 
-    // Fisher-Yates Shuffle
     private void shuffle(int[] dirs) {
         for (int i = dirs.length - 1; i > 0; i--) {
             int j = random.nextInt(i + 1);

@@ -16,10 +16,13 @@ public class MazeGame extends JFrame {
         MakeMaze make = new MakeMaze(41, 31, seed);
         int[][] maze = make.make();
 
-        // GamePanel = 미로 렌더링용 클라이언트 패널
+        //미로 렌더링용 클라이언트 패널
         GamePanel panel = new GamePanel();
         panel.setMaze(maze);                // 미로 적용
         panel.setExit(make.getExitX(), make.getExitY());  // 출구 표시
+
+        JScrollPane scrollPane = new JScrollPane(panel);
+        add(scrollPane, BorderLayout.CENTER);
 
         add(panel, BorderLayout.CENTER);
 

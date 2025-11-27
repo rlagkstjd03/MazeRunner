@@ -8,6 +8,7 @@ public class MazeRunnerServer {
     private static final int PORT = 5000;
 
     private final List<Client> clients = Collections.synchronizedList(new ArrayList<>(2));
+    private final GameState gameState = new GameState();  // ★ 추가
 
     public static void main(String[] args) {
         new MazeRunnerServer().start();
@@ -18,15 +19,18 @@ public class MazeRunnerServer {
         try (ServerSocket ss = new ServerSocket(PORT)) {
             while (true) {
                 Socket s = ss.accept();
+
                 if (clients.size() >= 2) {
                     new PrintWriter(new OutputStreamWriter(s.getOutputStream(), "UTF-8"), true)
                             .println("FULL");
                     s.close();
                     continue;
                 }
-                int role = clients.size() + 1; // 1 or 2
+
+                int role = clients.size() + 1;
                 Client c = new Client(s, role);
                 clients.add(c);
+
                 new Thread(() -> handle(c)).start();
             }
         } catch (IOException e) {
@@ -42,33 +46,50 @@ public class MazeRunnerServer {
             String line;
             while ((line = c.in.readLine()) != null) {
                 line = line.trim();
+
                 if (line.startsWith("JOIN ")) {
                     c.name = line.substring(5).trim();
-                    System.out.println("[Server] JOIN: role=" + c.role + ", name=" + c.name);
                     broadcastState();
-                } else if (line.startsWith("READY ")) {
+                }
+
+                else if (line.startsWith("READY ")) {
                     c.ready = "1".equals(line.substring(6).trim());
-                    System.out.println("[Server] READY: role=" + c.role + " -> " + c.ready);
                     broadcastState();
-                } else if (line.equals("START")) {
-                    // host만 가능 + 두 명 접속 + 둘 다 READY
-                    if (c.role == 1 && clients.size() == 2 && clients.get(0).ready && clients.get(1).ready) {
+                }
+
+                else if (line.equals("START")) {
+                    if (c.role == 1 &&
+                            clients.size() == 2 &&
+                            clients.get(0).ready &&
+                            clients.get(1).ready) {
+
+                        System.out.println("[Server] Generating maze...");
+                        gameState.generateMaze();
+
+                        // ★ 미로 전송
+                        broadcast(gameState.mazeToString());
+
+                        // ★ 출구 전송
+                        broadcast("EXIT|" + gameState.getExitX() + "|" + gameState.getExitY());
+
+                        // ★ 게임 시작 신호
                         broadcast("START");
-                        System.out.println("[Server] START sent to all");
+
+                        System.out.println("[Server] Maze + START sent.");
                     }
                 }
             }
+
         } catch (IOException e) {
             System.out.println("[Server] Client disconnected (role " + c.role + ")");
         } finally {
-            try { c.socket.close(); } catch (IOException ignored) {}
+            try { c.socket.close(); } catch (IOException ignored){}
             clients.remove(c);
             broadcastState();
         }
     }
 
     private void broadcastState() {
-        // STATE|p1Present|p1Name|p1Ready|p2Present|p2Name|p2Ready|canStart
         boolean p1Present = clients.stream().anyMatch(cl -> cl.role == 1);
         boolean p2Present = clients.stream().anyMatch(cl -> cl.role == 2);
 
@@ -90,6 +111,7 @@ public class MazeRunnerServer {
                 p2Ready ? "1" : "0",
                 canStart ? "1" : "0"
         );
+
         broadcast(msg);
     }
 
@@ -105,7 +127,8 @@ public class MazeRunnerServer {
         final Socket socket;
         final BufferedReader in;
         final PrintWriter out;
-        final int role;      // 1: host, 2: guest
+        final int role;
+
         String name = "";
         boolean ready = false;
 
