@@ -24,7 +24,6 @@ public class MazeGame extends JFrame {
         JScrollPane scrollPane = new JScrollPane(panel);
         add(scrollPane, BorderLayout.CENTER);
 
-        add(panel, BorderLayout.CENTER);
 
         pack();
         setLocationRelativeTo(null);

@@ -1,5 +1,7 @@
 package Client;
 
+import maze_game.MazeGame;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -23,6 +25,9 @@ import java.net.*;
  * - 서버와 TCP 통신 (JOIN/STATE/READY/START 메시지 처리)
  */
 public class MazeRunnerClient extends JFrame {
+
+    private GamePanel gamePanel;
+    private MazeGame mazeGame;
 
     // ===== 이미지 파일 경로 =====
     private static final String IMG_TITLE_BG    = "title_bg.png";
@@ -79,12 +84,13 @@ public class MazeRunnerClient extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(900, 600);
         setLocationRelativeTo(null);
+        gamePanel = new GamePanel();
 
         // 화면 구성
         root.add(buildStartCard(),   "start");
         root.add(buildConnectCard(), "connect");
         root.add(buildLobbyCard(),   "lobby");
-        root.add(buildGameCard(),    "game");
+        root.add(gamePanel,    "game");
         add(root);
 
         cards.show(root, "start");
@@ -464,24 +470,7 @@ public class MazeRunnerClient extends JFrame {
         return p;
     }
 
-    // =====================================================================
-    // 4) Game 화면 (플레이스홀더)
-    // =====================================================================
-    private JComponent buildGameCard() {
-        JPanel p = new JPanel(new BorderLayout());
-        p.setBackground(new Color(22,22,26));
-
-        JLabel l = new JLabel("게임 시작! (여기서 미로 화면으로 전환 예정)", SwingConstants.CENTER);
-        l.setForeground(Color.WHITE);
-        l.setFont(new Font("Malgun Gothic", Font.BOLD, 22));
-
-        p.add(l, BorderLayout.CENTER);
-        return p;
-    }
-
-    // =====================================================================
     // 서버 메시지 수신 루프
-    // =====================================================================
     private void recvLoop() {
         try {
             String line;
