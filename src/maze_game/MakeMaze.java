@@ -83,16 +83,4 @@ public class MakeMaze {
 
     public int getExitX() { return exitX; }
     public int getExitY() { return exitY; }
-
-    // 테스트용 출력
-    public void print() {
-        for (int y = 0; y < hei; y++) {
-            for (int x = 0; x < wid; x++) {
-                if (x == 1 && y == 1) System.out.print("입");     // 입구
-                else if (x == exitX && y == exitY) System.out.print("출"); // 출구
-                else System.out.print(maze[y][x] == 1 ? "  " : "■");
-            }
-            System.out.println();
-        }
-    }
 }
