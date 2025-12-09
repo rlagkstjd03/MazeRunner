@@ -7,6 +7,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.io.PrintWriter;
 
@@ -20,12 +21,29 @@ public class GamePanel extends JPanel implements KeyListener {
     private Player player1; // 나
     private Player player2; // 상대
 
+    private BufferedImage floor;
     private BufferedImage wallTile;
     private BufferedImage flag;
-    private BufferedImage player_1;
-    private BufferedImage player_2;
 
-    private PrintWriter out;   // 서버 송신 (나중에 setNetworkOutput로 연결됨)
+    // --- 플레이어 1 이미지 ---
+    private BufferedImage p1_stand;
+    private BufferedImage p1_walk_l;
+    private BufferedImage p1_walk_r;
+
+    // --- 플레이어 2 이미지 ---
+    private BufferedImage p2_stand;
+    private BufferedImage p2_walk_l;
+    private BufferedImage p2_walk_r;
+
+    private boolean p1Walking = false;
+    private boolean p2Walking = false;
+
+    private long lastFrameTime = 0;
+    private boolean walkFrame = false;   // true면 walk, false면 stand
+
+    private PrintWriter out;
+
+    private int visibileRadius = 140;
 
     public GamePanel(PrintWriter out) {
         this.out = out;
@@ -36,15 +54,26 @@ public class GamePanel extends JPanel implements KeyListener {
 
         setFocusable(true);
         addKeyListener(this);
+
+        requestFocusInWindow();
     }
 
     /* ===================== 이미지 로딩 ===================== */
     private void loadImages() {
         try {
-            wallTile = ImageIO.read(getClass().getResource("/Client/floor.png"));
-            flag = ImageIO.read(getClass().getResource("/Client/flag.png"));
-            player_1 = ImageIO.read(getClass().getResource("/Client/player1_r.png"));
-            player_2 = ImageIO.read(getClass().getResource("/Client/player2_r.png"));
+            floor    = ImageIO.read(getClass().getResource("/Client/floor.png"));
+            wallTile = ImageIO.read(getClass().getResource("/Client/wall.png"));
+            flag     = ImageIO.read(getClass().getResource("/Client/flag.png"));
+
+            // ★ 방향별 이미지 로딩
+            p1_stand   = ImageIO.read(getClass().getResource("/Client/player1_stand.png"));
+            p1_walk_l  = ImageIO.read(getClass().getResource("/Client/player1_walk_l.png"));
+            p1_walk_r  = ImageIO.read(getClass().getResource("/Client/player1_walk_r.png"));
+
+            p2_stand   = ImageIO.read(getClass().getResource("/Client/player2_stand.png"));
+            p2_walk_l  = ImageIO.read(getClass().getResource("/Client/player2_walk_l.png"));
+            p2_walk_r  = ImageIO.read(getClass().getResource("/Client/player2_walk_r.png"));
+
         } catch (Exception e) {
             System.out.println("이미지 로딩 실패: " + e);
         }
@@ -54,6 +83,8 @@ public class GamePanel extends JPanel implements KeyListener {
     @Override
     public void keyPressed(KeyEvent e) {
         if (out == null) return;
+
+        p1Walking = true;
 
         switch (e.getKeyCode()) {
             case KeyEvent.VK_UP:    out.println("MOVE UP");    break;
@@ -66,14 +97,14 @@ public class GamePanel extends JPanel implements KeyListener {
     @Override public void keyReleased(KeyEvent e) {}
     @Override public void keyTyped(KeyEvent e) {}
 
-    /* ===================== MazeRunnerClient에서 네트워크 출력 스트림 설정 ===================== */
     public void setNetworkOutput(PrintWriter out) {
         this.out = out;
     }
 
-    /* ===================== 서버로부터 받은 좌표 적용 ===================== */
+    /* ===================== 서버 좌표 반영 ===================== */
     public void updatePlayer1Position(int x, int y) {
         if (player1 != null) {
+            p1Walking = (player1.getX() != x || player1.getY() != y);
             player1.setPosition(x, y);
             repaint();
         }
@@ -81,12 +112,13 @@ public class GamePanel extends JPanel implements KeyListener {
 
     public void updatePlayer2Position(int x, int y) {
         if (player2 != null) {
+            p2Walking = (player2.getX() != x || player2.getY() != y);
             player2.setPosition(x, y);
             repaint();
         }
     }
 
-    /* ===================== 서버에서 전달받은 미로 설정 ===================== */
+    /* ===================== 미로 설정 ===================== */
     public void setMaze(int[][] maze) {
         this.maze = maze;
 
@@ -97,14 +129,11 @@ public class GamePanel extends JPanel implements KeyListener {
                 new Dimension(maze[0].length * cellSize, maze.length * cellSize)
         );
 
-        // ★ 게임 시작 시 키포커스를 강하게 가져오기
         requestFocusInWindow();
-
         revalidate();
         repaint();
     }
 
-    /* ===================== 출구 좌표 설정 ===================== */
     public void setExit(int x, int y) {
         this.exitX = x;
         this.exitY = y;
@@ -115,46 +144,98 @@ public class GamePanel extends JPanel implements KeyListener {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-
         if (maze == null) return;
 
         Graphics2D g2 = (Graphics2D) g;
 
-        // 미로 타일
+        // === 1) 미로 타일 ===
         for (int y = 0; y < maze.length; y++) {
             for (int x = 0; x < maze[0].length; x++) {
 
-                // 벽만 그림
-                if (maze[y][x] == 0) {
-                    g2.drawImage(wallTile,
-                            x * cellSize, y * cellSize,
-                            cellSize, cellSize, null);
+                if (maze[y][x] == 1) {
+                    g2.drawImage(floor, x * cellSize, y * cellSize, cellSize, cellSize, null);
+                } else {
+                    g2.drawImage(wallTile, x * cellSize, y * cellSize, cellSize, cellSize, null);
                 }
             }
         }
 
-        // 출구 표시
+        // === 2) 출구 ===
         if (exitX != -1 && exitY != -1) {
-            g2.drawImage(flag,
-                    exitX * cellSize,
-                    exitY * cellSize,
-                    cellSize, cellSize, null);
+            g2.drawImage(flag, exitX * cellSize, exitY * cellSize, cellSize, cellSize, null);
         }
 
-        // 플레이어1 (나)
-        if (player1 != null) {
-            g2.drawImage(player_1,
-                    player1.getX() * cellSize,
-                    player1.getY() * cellSize,
-                    cellSize, cellSize, null);
+        // === 3) 애니메이션 프레임 업데이트 ===
+        long now = System.currentTimeMillis();
+        if (now - lastFrameTime > 180) {  // 0.18초마다 프레임 전환
+            walkFrame = !walkFrame;
+            lastFrameTime = now;
         }
 
-        // 플레이어2 (상대)
-        if (player2 != null) {
-            g2.drawImage(player_2,
-                    player2.getX() * cellSize,
-                    player2.getY() * cellSize,
-                    cellSize, cellSize, null);
+        // === 4) 플레이어1 이미지 선택 ===
+        BufferedImage img1;
+        if (p1Walking) {
+            if (!walkFrame) {
+                img1 = p1_stand;
+            } else {
+                img1 = (player1.getDirection() == Player.Direction.LEFT) ? p1_walk_l : p1_walk_r;
+            }
+        } else {
+            img1 = p1_stand;
         }
+
+        g2.drawImage(img1,
+                player1.getX() * cellSize, player1.getY() * cellSize,
+                cellSize, cellSize, null);
+
+        // === 5) 플레이어2 이미지 선택 ===
+        BufferedImage img2;
+        if (p2Walking) {
+            if (!walkFrame) {
+                img2 = p2_stand;
+            } else {
+                img2 = (player2.getDirection() == Player.Direction.LEFT) ? p2_walk_l : p2_walk_r;
+            }
+        } else {
+            img2 = p2_stand;
+        }
+
+        g2.drawImage(img2,
+                player2.getX() * cellSize, player2.getY() * cellSize,
+                cellSize, cellSize, null);
+
+        // === 6) 시야 (플레이어1 + 플레이어2) ===
+        BufferedImage fog = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D fg = fog.createGraphics();
+
+        // 전체 어둡게
+        fg.setColor(new Color(0, 0, 0, 200));
+        fg.fillRect(0, 0, getWidth(), getHeight());
+        fg.setComposite(AlphaComposite.DstOut);
+
+        // p1 시야
+        int p1x = player1.getX() * cellSize + cellSize / 2;
+        int p1y = player1.getY() * cellSize + cellSize / 2;
+
+        fg.fill(new Ellipse2D.Float(
+                p1x - visibileRadius,
+                p1y - visibileRadius,
+                visibileRadius * 2,
+                visibileRadius * 2
+        ));
+
+        // p2 시야
+        int p2x = player2.getX() * cellSize + cellSize / 2;
+        int p2y = player2.getY() * cellSize + cellSize / 2;
+
+        fg.fill(new Ellipse2D.Float(
+                p2x - visibileRadius,
+                p2y - visibileRadius,
+                visibileRadius * 2,
+                visibileRadius * 2
+        ));
+
+        fg.dispose();
+        g2.drawImage(fog, 0, 0, null);
     }
 }

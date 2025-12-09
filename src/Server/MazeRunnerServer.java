@@ -98,6 +98,18 @@ public class MazeRunnerServer {
                     if (c.role == 1) gameState.movePlayer1(dir);
                     else if (c.role == 2) gameState.movePlayer2(dir);
 
+                    // ====== ★ 승리 체크 추가 ★ ======
+                    if (gameState.p1x == gameState.exitX && gameState.p1y == gameState.exitY) {
+                        broadcast("WIN|1");        // 플레이어 1 승리
+                        continue; // 더 이상 MOVE 처리 안함
+                    }
+
+                    if (gameState.p2x == gameState.exitX && gameState.p2y == gameState.exitY) {
+                        broadcast("WIN|2");        // 플레이어 2 승리
+                        continue;
+                    }
+                    // =================================
+
                     // 모든 클라에게 위치 알려줌
                     broadcastPositions();
                 }
